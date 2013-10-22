@@ -31,9 +31,10 @@
 #import "NSDate+TimeInterval.h"
 
 #define IS_IOS7             ([[[UIDevice currentDevice] systemVersion] compare:@"7.0" options:NSNumericSearch] != NSOrderedAscending)
-#define kThumbnailLength    78.0f
-#define kThumbnailSize      CGSizeMake(kThumbnailLength, kThumbnailLength)
-#define kPopoverContentSize CGSizeMake(320, 480)
+#define kGroupThumbnailLength   70.0f
+#define kThumbnailLength        73.0f
+#define kThumbnailSize          CGSizeMake(kThumbnailLength, kThumbnailLength)
+#define kPopoverContentSize     CGSizeMake(320, 480)
 
 
 #pragma mark - Interfaces
@@ -41,12 +42,6 @@
 @interface CTAssetsPickerController ()
 
 @end
-
-
-@interface CTAssetsGroupViewController : UITableViewController
-
-@end
-
 
 @interface CTAssetsGroupViewController()
 
@@ -59,6 +54,7 @@
 @interface CTAssetsViewController : UICollectionViewController
 
 @property (nonatomic, strong) ALAssetsGroup *assetsGroup;
+@property (nonatomic, assign) NSInteger maximumNumberOfSelection;
 
 @end
 
@@ -121,24 +117,52 @@
 
 #pragma mark - CTAssetsPickerController
 
+@interface CTAssetsPickerController()
+@property (nonatomic, strong) UIViewController *rootViewController;
+@end
 
 @implementation CTAssetsPickerController
 
 - (id)init
 {
     CTAssetsGroupViewController *groupViewController = [[CTAssetsGroupViewController alloc] init];
+    _rootViewController = groupViewController;
     
     if (self = [super initWithRootViewController:groupViewController])
     {
-        _maximumNumberOfSelection   = NSIntegerMax;
-        _assetsFilter               = [ALAssetsFilter allAssets];
-        _showsCancelButton          = YES;
+        self.maximumNumberOfSelection   = NSIntegerMax;
+        self.assetsFilter               = [ALAssetsFilter allAssets];
+        self.showsCancelButton          = YES;
         
         if ([self respondsToSelector:@selector(setContentSizeForViewInPopover:)])
             [self setContentSizeForViewInPopover:kPopoverContentSize];
     }
     
     return self;
+}
+
+- (void)setShowsCancelButton:(BOOL)showsCancelButton
+{
+    _showsCancelButton = showsCancelButton;
+    
+    CTAssetsGroupViewController *groupViewController = (CTAssetsGroupViewController*)_rootViewController;
+    groupViewController.showsCancelButton = showsCancelButton;
+}
+
+- (void)setAssetsFilter:(ALAssetsFilter *)assetsFilter
+{
+    _assetsFilter = assetsFilter;
+    
+    CTAssetsGroupViewController *groupViewController = (CTAssetsGroupViewController*)_rootViewController;
+    groupViewController.assetsFilter = assetsFilter;
+}
+
+- (void)setMaximumNumberOfSelection:(NSInteger)maximumNumberOfSelection
+{
+    _maximumNumberOfSelection = maximumNumberOfSelection;
+    
+    CTAssetsGroupViewController *groupViewController = (CTAssetsGroupViewController*)_rootViewController;
+    groupViewController.maximumNumberOfSelection = maximumNumberOfSelection;
 }
 
 - (void)viewDidLoad
@@ -186,15 +210,13 @@
 
 - (void)setupViews
 {
-    self.tableView.rowHeight = kThumbnailLength + 12;
+    self.tableView.rowHeight = kGroupThumbnailLength + 10;
     self.tableView.separatorStyle = UITableViewCellSeparatorStyleNone;
 }
 
 - (void)setupButtons
 {
-    CTAssetsPickerController *picker = (CTAssetsPickerController *)self.navigationController;
-    
-    if (picker.showsCancelButton)
+    if (self.showsCancelButton)
     {
         self.navigationItem.rightBarButtonItem =
         [[UIBarButtonItem alloc] initWithTitle:NSLocalizedString(@"Cancel", nil)
@@ -219,8 +241,7 @@
     else
         [self.groups removeAllObjects];
     
-    CTAssetsPickerController *picker = (CTAssetsPickerController *)self.navigationController;
-    ALAssetsFilter *assetsFilter = picker.assetsFilter;
+    ALAssetsFilter *assetsFilter = self.assetsFilter;
     
     ALAssetsLibraryGroupsEnumerationResultsBlock resultsBlock = ^(ALAssetsGroup *group, BOOL *stop) {
         
@@ -399,14 +420,15 @@
 
 #pragma mark - Table view delegate
 
-- (float)tableView:(UITableView *)tableView heightForRowAtIndexPath:(NSIndexPath *)indexPath
+- (CGFloat)tableView:(UITableView *)tableView heightForRowAtIndexPath:(NSIndexPath *)indexPath
 {
-    return kThumbnailLength + 12;
+    return kGroupThumbnailLength + 10;
 }
 
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath
 {
     CTAssetsViewController *vc = [[CTAssetsViewController alloc] init];
+    vc.maximumNumberOfSelection = self.maximumNumberOfSelection;
     vc.assetsGroup = [self.groups objectAtIndex:indexPath.row];
 
     [self.navigationController pushViewController:vc animated:YES];
@@ -432,19 +454,38 @@
 
 @implementation CTAssetsGroupViewCell
 
-
 - (void)bind:(ALAssetsGroup *)assetsGroup
 {
     self.assetsGroup            = assetsGroup;
     
     CGImageRef posterImage      = assetsGroup.posterImage;
     size_t height               = CGImageGetHeight(posterImage);
-    float scale                 = height / kThumbnailLength;
+    float scale                 = height / kGroupThumbnailLength;
     
     self.imageView.image        = [UIImage imageWithCGImage:posterImage scale:scale orientation:UIImageOrientationUp];
     self.textLabel.text         = [assetsGroup valueForProperty:ALAssetsGroupPropertyName];
     self.detailTextLabel.text   = [NSString stringWithFormat:@"%d", [assetsGroup numberOfAssets]];
     self.accessoryType          = UITableViewCellAccessoryDisclosureIndicator;
+}
+
+- (void)layoutSubviews
+{
+    [super layoutSubviews];
+    
+    CGRect textLabelFrame = self.textLabel.frame;
+    textLabelFrame.origin.x = kGroupThumbnailLength + 20;
+    textLabelFrame.size.width = self.frame.size.width - textLabelFrame.origin.x - 10;
+    self.textLabel.frame = textLabelFrame;
+    
+    CGRect detailTextLabelFrame = self.detailTextLabel.frame;
+    detailTextLabelFrame.origin.x = kGroupThumbnailLength + 20;
+    detailTextLabelFrame.size.width = self.frame.size.width - textLabelFrame.origin.x - 10;
+    self.detailTextLabel.frame = detailTextLabelFrame;
+    
+    CGRect imageViewFrame = self.imageView.frame;
+    imageViewFrame.origin.x = 10;
+    imageViewFrame.origin.y = 5;
+    self.imageView.frame = imageViewFrame;
 }
 
 - (NSString *)accessibilityLabel
@@ -520,11 +561,17 @@
 
 - (void)setupButtons
 {
-    self.navigationItem.rightBarButtonItem =
-    [[UIBarButtonItem alloc] initWithTitle:NSLocalizedString(@"Done", nil)
-                                     style:UIBarButtonItemStylePlain
-                                    target:self
-                                    action:@selector(finishPickingAssets:)];
+    if (self.collectionView.indexPathsForSelectedItems.count>0)
+    {
+        self.navigationItem.rightBarButtonItem =
+        [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemDone
+                                                      target:self
+                                                      action:@selector(finishPickingAssets:)];
+    }
+    else
+    {
+        self.navigationItem.rightBarButtonItem = nil;
+    }
 }
 
 - (void)setupAssets
@@ -603,19 +650,19 @@
 
 - (BOOL)collectionView:(UICollectionView *)collectionView shouldSelectItemAtIndexPath:(NSIndexPath *)indexPath
 {
-    CTAssetsPickerController *vc = (CTAssetsPickerController *)self.navigationController;
-    
-    return ([collectionView indexPathsForSelectedItems].count < vc.maximumNumberOfSelection);
+    return ([collectionView indexPathsForSelectedItems].count < self.maximumNumberOfSelection);
 }
 
 - (void)collectionView:(UICollectionView *)collectionView didSelectItemAtIndexPath:(NSIndexPath *)indexPath
 {
     [self setTitleWithSelectedIndexPaths:collectionView.indexPathsForSelectedItems];
+    [self setupButtons];
 }
 
 - (void)collectionView:(UICollectionView *)collectionView didDeselectItemAtIndexPath:(NSIndexPath *)indexPath
 {
     [self setTitleWithSelectedIndexPaths:collectionView.indexPathsForSelectedItems];
+    [self setupButtons];
 }
 
 
@@ -623,42 +670,42 @@
 
 - (void)setTitleWithSelectedIndexPaths:(NSArray *)indexPaths
 {
-    // Reset title to group name
-    if (indexPaths.count == 0)
-    {
-        self.title = [self.assetsGroup valueForProperty:ALAssetsGroupPropertyName];
-        return;
-    }
-    
-    BOOL photosSelected = NO;
-    BOOL videoSelected  = NO;
-    
-    for (NSIndexPath *indexPath in indexPaths)
-    {
-        ALAsset *asset = [self.assets objectAtIndex:indexPath.item];
-        
-        if ([[asset valueForProperty:ALAssetPropertyType] isEqual:ALAssetTypePhoto])
-            photosSelected  = YES;
-        
-        if ([[asset valueForProperty:ALAssetPropertyType] isEqual:ALAssetTypeVideo])
-            videoSelected   = YES;
-        
-        if (photosSelected && videoSelected)
-            break;
-    }
-    
-    NSString *format;
-    
-    if (photosSelected && videoSelected)
-        format = NSLocalizedString(@"%d Items Selected", nil);
-    
-    else if (photosSelected)
-        format = (indexPaths.count > 1) ? NSLocalizedString(@"%d Photos Selected", nil) : NSLocalizedString(@"%d Photo Selected", nil);
-
-    else if (videoSelected)
-        format = (indexPaths.count > 1) ? NSLocalizedString(@"%d Videos Selected", nil) : NSLocalizedString(@"%d Video Selected", nil);
-    
-    self.title = [NSString stringWithFormat:format, indexPaths.count];
+//    // Reset title to group name
+//    if (indexPaths.count == 0)
+//    {
+//        self.title = [self.assetsGroup valueForProperty:ALAssetsGroupPropertyName];
+//        return;
+//    }
+//    
+//    BOOL photosSelected = NO;
+//    BOOL videoSelected  = NO;
+//    
+//    for (NSIndexPath *indexPath in indexPaths)
+//    {
+//        ALAsset *asset = [self.assets objectAtIndex:indexPath.item];
+//        
+//        if ([[asset valueForProperty:ALAssetPropertyType] isEqual:ALAssetTypePhoto])
+//            photosSelected  = YES;
+//        
+//        if ([[asset valueForProperty:ALAssetPropertyType] isEqual:ALAssetTypeVideo])
+//            videoSelected   = YES;
+//        
+//        if (photosSelected && videoSelected)
+//            break;
+//    }
+//    
+//    NSString *format;
+//    
+//    if (photosSelected && videoSelected)
+//        format = NSLocalizedString(@"%d Items Selected", nil);
+//    
+//    else if (photosSelected)
+//        format = (indexPaths.count > 1) ? NSLocalizedString(@"%d Photos Selected", nil) : NSLocalizedString(@"%d Photo Selected", nil);
+//
+//    else if (videoSelected)
+//        format = (indexPaths.count > 1) ? NSLocalizedString(@"%d Videos Selected", nil) : NSLocalizedString(@"%d Video Selected", nil);
+//    
+//    self.title = [NSString stringWithFormat:format, indexPaths.count];
 }
 
 
@@ -678,7 +725,12 @@
     if ([picker.delegate respondsToSelector:@selector(assetsPickerController:didFinishPickingAssets:)])
         [picker.delegate assetsPickerController:picker didFinishPickingAssets:assets];
     
-    [picker.presentingViewController dismissViewControllerAnimated:YES completion:NULL];
+    if (picker.presentingViewController)
+        [picker.presentingViewController dismissViewControllerAnimated:YES completion:NULL];
+    else
+    {
+        [self.navigationController popToRootViewControllerAnimated:YES];
+    }
 }
 
 @end

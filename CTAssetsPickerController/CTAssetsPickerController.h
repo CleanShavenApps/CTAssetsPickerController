@@ -30,7 +30,22 @@
 #import <AssetsLibrary/AssetsLibrary.h>
 #import <UIKit/UIKit.h>
 
+@interface CTAssetsGroupViewController : UITableViewController
 
+/// Set the ALAssetsFilter to filter the picker contents.
+@property (nonatomic, strong) ALAssetsFilter *assetsFilter;
+
+/// The maximum number of assets to be picked.
+@property (nonatomic, assign) NSInteger maximumNumberOfSelection;
+
+/**
+ Determines whether or not the cancel button is visible in the picker
+ @discussion The cancel button is visible by default. To hide the cancel button, (e.g. presenting the picker in UIPopoverController)
+ set this property’s value to NO.
+ */
+@property (nonatomic, assign) BOOL showsCancelButton;
+
+@end
 
 @protocol CTAssetsPickerControllerDelegate;
 
